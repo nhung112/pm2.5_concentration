@@ -4,6 +4,6 @@ __pycache__/
 *$py.class
 
 # Latex
-.tex
-.aux
-.bib
+*.tex
+*.aux
+*.bib
