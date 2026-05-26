@@ -1,0 +1,320 @@
+
+\documentclass[11pt]{article}
+\usepackage{fix-cm}
+\usepackage[margin=1in]{geometry}
+
+% Core packages
+\usepackage{amsmath,amssymb}
+\usepackage{tikz-cd}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{xparse}
+\usepackage{hyperref}
+
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue}
+
+\makeatletter
+\renewcommand{\@dotsep}{10000}
+\makeatother
+
+\definecolor{prismgray}{RGB}{75,75,75}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rfoot{\small \thepage{ }\textbar{ }Assignment Time-Series}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\titleformat{\section}
+  {\fontsize{16}{20}\selectfont\bfseries\color{black}\raggedright}
+  {}
+  {0pt}
+  {}
+\titleformat{\subsection}
+  {\large\bfseries\color{black}}
+  {}
+  {0pt}
+  {\MakeUppercase}
+\titlespacing*{\section}{0pt}{1.5\baselineskip}{0.5\baselineskip}
+\titlespacing*{\subsection}{0pt}{1\baselineskip}{0.2\baselineskip}
+
+% Paragraphs
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5\baselineskip}
+
+\newcommand{\chapternumber}[2][]{%
+  \phantomsection%
+  \def\chaptertitle{#2}%
+  \if\relax\detokenize{#1}\relax
+    \section*{#2}%
+    \addcontentsline{toc}{section}{#2}%
+  \else
+    \section*{#1 \textbar{} #2}%
+    \addcontentsline{toc}{section}{#1 \textbar{} #2}%
+  \fi
+}
+
+\newcommand{\subheading}[1]{%
+  \phantomsection%
+  \subsection*{#1}%
+  \addcontentsline{toc}{subsection}{#1}%
+}
+
+\begin{document}
+\sloppy
+\hbadness=10000
+\pagenumbering{roman}
+\thispagestyle{empty}
+\begin{center}
+\vspace*{1.35in}
+{\fontsize{24}{18}\selectfont\bfseries ASSIGNMENT TIME-SERIES}\par
+\vspace{1in}
+{\fontsize{30}{38}\selectfont\bfseries Time-Series Forecast of PM2.5 Concentration in Delhi}\par
+\vspace{0.35in}
+{\LARGE Using a SARIMA Model}\par
+\vspace{2in}
+\begin{tabular}{rl}
+Fullname: & Nguyen Hong Nhung \\
+Student ID: & 11230579 \\
+Instructor: & Tran Thi Ha \\
+Date: & \today
+\end{tabular}
+\vfill
+\end{center}
+\newpage
+
+\thispagestyle{empty}
+\section*{Abstract}
+This short draft is prepared as a format check.  The structure follows a concise research-paper guide style: a title page, a contents page, numbered thematic sections, short explanatory paragraphs, and a references page.
+
+\newpage
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+
+\pagenumbering{arabic}
+
+\chapternumber{Introduction}
+
+Delhi experiences recurring episodes of severe particulate pollution, especially during winter months when meteorological conditions trap pollutants close to the ground.  Forecasting PM2.5 concentration is therefore useful for public-health warnings, school and workplace advisories, and short-run pollution-control decisions.
+
+This project asks whether a seasonal autoregressive integrated moving average model can produce reliable short-term forecasts of daily PM2.5 concentration in Delhi.  The main empirical question is: how well can past PM2.5 values and seasonal patterns explain near-future concentration levels?
+
+
+\chapternumber[One]{Data}
+This study uses the public \textit{Air Quality Data in India} dataset distributed on Kaggle by Rohan Rao. The dataset is a curated release of city-level air-quality observations originally sourced from the Central Pollution Control Board (CPCB), India's national pollution-control authority. The full Kaggle file, \texttt{city\_day.csv}, contains daily observations for multiple Indian cities, but this project restricts the analysis to Delhi in order to construct a single-city time series suitable for SARIMA forecasting. This restriction is methodologically important because SARIMA assumes a temporally ordered sequence from one data-generating process; combining cities would introduce cross-sectional heterogeneity that is not part of the present modeling objective.
+
+The resulting Delhi subset is used as the empirical foundation for the report. The response variable is daily PM2.5 concentration, while the remaining pollutants and AQI variables are used to understand the broader air-quality context. The data chapter therefore has two purposes: first, to document the source, coverage, and preprocessing decisions; second, to summarize the exploratory patterns that motivate a seasonal time-series model.
+
+\subheading{Dataset Scope}
+After filtering the original source to Delhi, the working dataset contains 2,009 daily observations from 1 January 2015 to 1 July 2020. The dataset confirms that each row corresponds to one date in Delhi and that the columns include \texttt{City}, \texttt{Date}, \texttt{PM2.5}, \texttt{PM10}, \texttt{NO}, \texttt{NO2}, \texttt{NOx}, \texttt{NH3}, \texttt{CO}, \texttt{SO2}, \texttt{O3}, \texttt{Benzene}, \texttt{Toluene}, \texttt{AQI}, and \texttt{AQI\_Bucket}. These variables capture both particulate pollution and gaseous pollutants associated with traffic, combustion, industrial activity, secondary atmospheric reactions, and volatile organic compounds.
+
+The target variable for forecasting is \texttt{PM2.5}, measured as fine particulate matter with aerodynamic diameter less than or equal to 2.5 micrometers. PM2.5 is selected because it is one of the most policy-relevant air-pollution indicators and because preliminary time-series diagnostics indicate strong temporal persistence in the series. Although the dataset includes several explanatory pollutants, the initial SARIMA specification is intentionally univariate: the model uses historical PM2.5 behavior to forecast future PM2.5 values. This design provides a transparent benchmark before considering richer multivariate or machine-learning extensions.
+
+\subheading{Data Quality and Preprocessing}
+The preprocessing stage converts the \texttt{Date} column from string format to a datetime object and orders observations chronologically. The resulting date range is continuous at the daily level for the processed Delhi subset used in the analysis. The data audit reports 2,009 non-null observations for all 15 variables and zero duplicate rows. This is a favorable property for time-series modeling because missing values, duplicated dates, or inconsistent ordering can bias autocorrelation patterns and distort the estimation of autoregressive and moving-average terms.
+
+Temporal information is also extracted from the date variable by constructing features such as year, quarter, month, and day of week for exploratory purposes. These engineered calendar variables are not necessarily included directly in a SARIMA model, but they are useful for diagnosing seasonality and recurring pollution cycles. In addition, the exploratory analysis compares weekday and weekend averages, evaluates correlations among pollutants, and examines extreme observations to determine whether the PM2.5 series contains spikes that may be difficult for a purely linear seasonal model to forecast.
+
+\subheading{Exploratory Data Analysis}
+The descriptive statistics show that Delhi's PM2.5 concentration is highly variable over the study period. PM2.5 ranges from 10.24 to 685.36 $\mu$g/m$^3$, with a mean of 117.10 $\mu$g/m$^3$, a median of 94.49 $\mu$g/m$^3$, and a standard deviation of 82.93 $\mu$g/m$^3$. The mean is notably larger than the median, indicating a right-skewed distribution in which extreme pollution episodes pull the average upward. This pattern is important for forecasting because high-pollution spikes can increase forecast error even when the model captures the normal daily dynamics reasonably well.
+
+The particulate variables are also large in magnitude relative to other pollutants. PM10 has a mean of 233.95 $\mu$g/m$^3$ and ranges from 18.59 to 796.88 $\mu$g/m$^3$, which indicates that coarse and fine particulate pollution move within a generally severe pollution environment. The AQI variable has a mean of 258.63 and a median of 257.00, and the most frequent AQI category is ``Poor,'' appearing on 542 days. This distribution suggests that poor air quality is not limited to isolated events; rather, elevated pollution is a recurring feature of the Delhi time series.
+
+The extreme-value analysis further shows that the highest PM2.5 observations cluster around early November. The maximum PM2.5 concentration is 685.36 $\mu$g/m$^3$ on 6 November 2016, followed by 639.19 $\mu$g/m$^3$ on 8 November 2017, 588.39 $\mu$g/m$^3$ on 5 November 2016, 582.28 $\mu$g/m$^3$ on 3 November 2019, and 537.96 $\mu$g/m$^3$ on 2 November 2016. By contrast, the lowest PM2.5 values occur mainly during monsoon-season months, including 10.24 $\mu$g/m$^3$ on 17 August 2019 and 10.88 $\mu$g/m$^3$ on 30 July 2017. The timing of these extremes is consistent with a strong seasonal component: late autumn and winter episodes tend to produce unusually high PM2.5, while mid-year periods tend to be cleaner.
+
+Correlation analysis supports the selection of PM2.5 as the central forecasting target. PM2.5 is strongly correlated with AQI ($r=0.882$), indicating that changes in PM2.5 closely track changes in the overall air-quality index. PM2.5 is also strongly correlated with PM10 ($r=0.839$), Benzene ($r=0.698$), NO ($r=0.668$), and NO2 ($r=0.647$). These associations suggest that fine particulate matter is linked to broader pollution processes, including traffic emissions, combustion sources, and co-movement with other particulate pollutants. However, because the project focuses on SARIMA, these correlations are interpreted descriptively rather than used as regressors in the baseline model.
+
+Seasonal analysis provides the strongest motivation for using a seasonal time-series specification. The seasonal summary shows that average PM2.5 is highest in the first quarter, at 142.36 $\mu$g/m$^3$, and lowest in the second quarter, at 84.40 $\mu$g/m$^3$. This difference is large enough to indicate that the series is not purely random around a constant mean. Instead, the data show recurring calendar-related changes in pollution intensity. Such behavior is exactly the type of structure that SARIMA is designed to capture through seasonal differencing and seasonal autoregressive or moving-average terms.
+
+The weekday-weekend comparison is less pronounced. Average PM2.5 is 117.39 $\mu$g/m$^3$ for Monday to Friday and 116.38 $\mu$g/m$^3$ on weekends. The difference is small relative to the overall standard deviation of the series, suggesting that weekday activity patterns alone do not explain most of the variation in PM2.5. For this dataset, broader seasonal forces and persistence over adjacent days appear more relevant than a simple weekly contrast.
+
+Finally, the autocorrelation analysis indicates that PM2.5 exhibits temporal dependence. In practical terms, this means that today's concentration is informative about tomorrow's concentration, and pollution shocks may persist for several days before dissipating. This persistence is central to the SARIMA approach: the autoregressive component captures dependence on previous PM2.5 values, while the moving-average component captures serially correlated shocks. The observed seasonality and autocorrelation together justify treating PM2.5 forecasting as a time-series problem rather than as an independent cross-sectional prediction task.
+
+\subheading{Implications for Forecasting}
+The exploratory analysis indicates that the Delhi PM2.5 series is suitable for SARIMA modeling for three reasons. First, the dataset is a clean daily time series with no missing values or duplicate records after preprocessing. Second, PM2.5 displays strong persistence, meaning that lagged values contain useful predictive information. Third, the seasonal contrast between high-pollution and low-pollution periods suggests that a seasonal model should be more appropriate than a non-seasonal ARIMA model.
+
+At the same time, the exploratory evidence also identifies limitations that must be considered when evaluating forecasts. Extreme PM2.5 spikes, especially those concentrated around early November, may reflect events or meteorological conditions that are not fully represented by past PM2.5 values alone. Therefore, SARIMA should be interpreted as a transparent statistical benchmark rather than a complete causal model of Delhi air pollution. If forecast errors are concentrated around extreme episodes, future work should consider exogenous variables such as wind speed, temperature, rainfall, festival periods, or crop-burning indicators.
+
+
+
+\chapternumber[Two]{Methodology}
+This chapter describes the statistical methodology used in the forecasting PM2.5 concentration. The workflow follows a time-series modeling logic: first, the Delhi PM2.5 series is split chronologically into training and testing periods; second, the training period is examined for correlation, stationarity, seasonality, and autocorrelation; third, several forecasting models are estimated and compared on the same holdout test set. The final methodological objective is not only to fit a SARIMA model, but also to evaluate whether transformations, exogenous variables, or ensemble forecasts improve short-term predictive accuracy.
+
+\subheading{Train-Test Design}
+The dataset is indexed by date and assigned a daily frequency. The \texttt{City} column is removed because the analysis uses only Delhi, and \texttt{Date} becomes the time index. To avoid data leakage, the split is performed before model selection and performance evaluation. The training set contains 1,978 observations from 1 January 2015 to 31 May 2020, while the test set contains the final 31 observations from 1 June 2020 to 1 July 2020. This chronological split is essential because future PM2.5 values must not influence parameter estimation or preprocessing decisions used for forecasting.
+
+Let $y_t$ denote daily PM2.5 concentration. The forecasting task is to estimate future values $\hat{y}_{t+h}$ for the 31-day test horizon using information available up to the end of the training period. Model performance is evaluated by comparing $\hat{y}_t$ with the observed test values $y_t$.
+
+
+\subheading{Pre-Model Diagnostics}
+Before fitting a time-series model, the structure of the series must be examined. Pre-model diagnostics are used to determine whether the data contain trend, seasonality, changing variance, or autocorrelation. These properties influence the choice of model and the transformations required before estimation.
+
+A common first step is seasonal decomposition. For an additive time-series structure, the observed series can be written as
+\[
+y_t = T_t + S_t + R_t,
+\]
+where $T_t$ is the trend component, $S_t$ is the seasonal component, and $R_t$ is the residual or irregular component. This decomposition helps separate long-run movement, repeated calendar patterns, and unexplained shocks. For PM2.5 forecasting, decomposition is useful because air pollution often changes systematically across seasons and may also exhibit short-run weekly patterns.
+
+Stationarity is another central requirement in ARIMA-type modeling. A weakly stationary series has a constant mean, constant variance, and autocovariances that depend only on the lag rather than on calendar time. If a series is non-stationary, the model may produce unstable parameter estimates and unreliable forecasts. Two common stationarity tests are the Augmented Dickey-Fuller (ADF) test and the KPSS test. The ADF test uses the null hypothesis that the series has a unit root, while the KPSS test uses the null hypothesis that the series is stationary. Using both tests gives a more balanced diagnosis because they approach stationarity from opposite null hypotheses.
+
+When non-stationarity is present, differencing is used to stabilize the series. Ordinary differencing removes local level changes:
+\[
+\nabla y_t = y_t-y_{t-1}.
+\]
+Seasonal differencing removes recurring seasonal behavior:
+\[
+\nabla_s y_t = y_t-y_{t-s},
+\]
+where $s$ is the seasonal period. For daily data, $s=7$ represents a weekly cycle. The purpose of differencing is not to remove all variation, but to remove systematic non-stationary structure so that the remaining series can be modeled with autoregressive and moving-average terms.
+
+Autocorrelation diagnostics are also required before model fitting. The autocorrelation function (ACF) measures the correlation between $y_t$ and $y_{t-k}$ for different lag values $k$. The partial autocorrelation function (PACF) measures the direct relationship between $y_t$ and $y_{t-k}$ after controlling for intermediate lags. In ARIMA modeling, ACF and PACF plots provide theoretical guidance for choosing autoregressive and moving-average orders.
+
+\subheading{Correlation, VIF, and Feature Screening}
+Although SARIMA is primarily a univariate forecasting method, correlation analysis is useful when the project considers extensions with exogenous variables. Correlation measures the strength and direction of linear association between two variables. For variables $X$ and $Y$, the Pearson correlation coefficient is
+\[
+r_{XY}=\frac{\sum_{t=1}^{n}(X_t-\bar{X})(Y_t-\bar{Y})}{\sqrt{\sum_{t=1}^{n}(X_t-\bar{X})^2}\sqrt{\sum_{t=1}^{n}(Y_t-\bar{Y})^2}}.
+\]
+A high positive correlation between PM2.5 and another pollutant suggests that the pollutant may contain useful information for explaining or forecasting PM2.5. However, correlation alone does not imply causation and should not be interpreted as evidence of a structural relationship.
+
+When several predictors are considered simultaneously, multicollinearity becomes a concern. Multicollinearity occurs when explanatory variables are strongly related to one another. In a regression or ARIMAX setting, this can make coefficient estimates unstable and difficult to interpret. A standard diagnostic for multicollinearity is the variance inflation factor (VIF):
+\[
+\mathrm{VIF}_j=\frac{1}{1-R_j^2},
+\]
+where $R_j^2$ is obtained by regressing predictor $x_j$ on the remaining predictors. A larger VIF indicates that predictor $x_j$ is highly explained by the other predictors. In applied work, variables with very high VIF values are often removed or treated cautiously.
+
+Feature screening therefore combines theoretical relevance and statistical diagnostics. A predictor should be related to the target variable, should not be excessively collinear with other predictors, and should be available for the forecast horizon. This last condition is especially important in time-series forecasting: an exogenous variable is only useful for prediction if its future values are known or can be forecasted reliably.
+
+\subheading{SARIMA Specification}
+The core model used in this project is the Seasonal Autoregressive Integrated Moving Average model, abbreviated as SARIMA. SARIMA is appropriate for a daily PM2.5 series because air pollution is usually temporally dependent: today's concentration is often related to concentrations observed in previous days. In addition, preliminary diagnostics indicate repeated seasonal behavior, which makes a seasonal extension of ARIMA more suitable than a purely non-seasonal model.
+
+A general SARIMA model is denoted as SARIMA$(p,d,q)(P,D,Q)_s$. The first group, $(p,d,q)$, represents the non-seasonal ARIMA structure. The parameter $p$ is the autoregressive order, $d$ is the number of ordinary differences used to stabilize the mean, and $q$ is the moving-average order. The second group, $(P,D,Q)_s$, represents the seasonal structure. The parameter $P$ is the seasonal autoregressive order, $D$ is the number of seasonal differences, $Q$ is the seasonal moving-average order, and $s$ is the seasonal period. For daily data, $s=7$ represents a weekly cycle.
+
+Using the backshift operator $B$, where $B y_t = y_{t-1}$, the SARIMA model can be written as
+\[
+\Phi_P(B^s)\phi_p(B)(1-B)^d(1-B^s)^D y_t
+= \Theta_Q(B^s)\theta_q(B)\varepsilon_t.
+\]
+Here, $\phi_p(B)$ is the non-seasonal autoregressive polynomial, $\theta_q(B)$ is the non-seasonal moving-average polynomial, $\Phi_P(B^s)$ is the seasonal autoregressive polynomial, and $\Theta_Q(B^s)$ is the seasonal moving-average polynomial. The error term $\varepsilon_t$ is assumed to be white noise with mean zero and constant variance. This assumption means that after the model has captured the systematic time dependence, the remaining errors should contain no predictable structure.
+
+The autoregressive component models persistence. In practical terms, it allows current PM2.5 to depend on previous PM2.5 values. The moving-average component models short-run shocks, such as sudden pollution increases or decreases that affect subsequent observations. Differencing is used to remove non-stationary behavior by modeling changes rather than raw levels. Seasonal differencing removes recurring seasonal patterns by comparing each observation with its value from the previous seasonal cycle.
+
+\subheading{Order Identification}
+The order of a SARIMA model is selected by combining statistical tests, diagnostic plots, and information criteria. Stationarity tests such as ADF and KPSS are used to decide whether differencing is needed. If the series has a changing mean or persistent seasonal cycles, ordinary differencing $(1-B)y_t$ or seasonal differencing $(1-B^s)y_t$ may be applied.
+
+ACF and PACF plots are used to guide the choice of autoregressive and moving-average orders. The autocorrelation function (ACF) measures correlation between $y_t$ and $y_{t-k}$ at different lags $k$. It is especially useful for detecting moving-average behavior and seasonality. The partial autocorrelation function (PACF) measures the direct correlation between $y_t$ and $y_{t-k}$ after controlling for shorter lags. It is especially useful for identifying autoregressive structure.
+
+Information criteria provide a formal way to compare candidate models. Two common criteria are Akaike Information Criterion (AIC) and Bayesian Information Criterion (BIC):
+\[
+\mathrm{AIC} = -2\ell + 2k,
+\]
+\[
+\mathrm{BIC} = -2\ell + k\log(n),
+\]
+where $\ell$ is the log-likelihood, $k$ is the number of estimated parameters, and $n$ is the number of observations. Lower AIC or BIC values indicate a better trade-off between goodness of fit and model complexity. In this project, Auto-ARIMA is used as a supporting tool to search over candidate SARIMA orders, but the final specification should still be interpreted using time-series theory and diagnostics.
+
+\subheading{Log-Transformed SARIMA}
+A log-transformed SARIMA model is considered because air-pollution data often exhibit heteroskedasticity, meaning that the variance changes with the pollution level. High PM2.5 periods can have much larger absolute fluctuations than low PM2.5 periods. A logarithmic transformation can reduce this scale effect and make the series more stable.
+
+The transformation is
+\[
+z_t=\log(y_t),
+\]
+where $y_t$ is the original PM2.5 concentration and $z_t$ is the transformed series. SARIMA is then fitted to $z_t$ instead of $y_t$. Forecasts are produced on the log scale and converted back to the original scale using
+\[
+\hat{y}_t = \exp(\hat{z}_t).
+\]
+The theoretical advantage of this method is variance stabilization. However, the transformation changes the interpretation of model errors: errors become multiplicative rather than additive on the original PM2.5 scale. Therefore, log-SARIMA should be evaluated empirically before being preferred over the baseline SARIMA model.
+
+\subheading{ARIMAX with Exogenous Variables}
+SARIMA is a univariate model because it forecasts PM2.5 using only past PM2.5 values and past shocks. ARIMAX extends this framework by adding exogenous variables. In this project, exogenous variables refer to other pollutants that may contain information about PM2.5 dynamics, such as nitrogen oxides or volatile organic compounds.
+
+A simplified ARIMAX structure can be written as
+\[
+y_t = \beta_0 + \boldsymbol{x}_t^{\prime}\boldsymbol{\beta} + u_t,
+\]
+where $\boldsymbol{x}_t$ is a vector of exogenous predictors, $\boldsymbol{\beta}$ is the vector of regression coefficients, and $u_t$ follows an ARIMA or SARIMA error process. The regression part captures the relationship between PM2.5 and other pollutants, while the time-series error component captures autocorrelation and seasonality that remain after accounting for the exogenous predictors.
+
+The main advantage of ARIMAX is that it can incorporate additional explanatory information. The main limitation is that future values of the exogenous variables must be known or forecasted for the same prediction horizon. If these future predictors are unavailable, ARIMAX is less practical for real-time forecasting than univariate SARIMA.
+
+\subheading{Ensemble Forecasting}
+Ensemble forecasting combines predictions from multiple models. The motivation is that different models may capture different aspects of the data. SARIMA captures additive temporal dependence and seasonality; log-SARIMA may handle changing variance; ARIMAX may incorporate information from related pollutants. Combining them can reduce model-specific error if their mistakes are not perfectly correlated.
+
+A simple ensemble takes the arithmetic mean of several forecasts:
+\[
+\hat{y}^{\mathrm{ens}}_t = \frac{1}{M}\sum_{m=1}^{M}\hat{y}^{(m)}_t,
+\]
+where $M$ is the number of component models and $\hat{y}^{(m)}_t$ is the forecast from model $m$. A weighted ensemble generalizes this idea:
+\[
+\hat{y}^{\mathrm{wens}}_t = \sum_{m=1}^{M}w_m\hat{y}^{(m)}_t,
+\qquad \sum_{m=1}^{M}w_m=1.
+\]
+The weights $w_m$ can be chosen based on prior reasoning, validation performance, or model reliability. A model with stronger validation accuracy can receive a larger weight, while a weaker but still informative model can receive a smaller weight. The ensemble approach is especially useful when no single model is expected to dominate across all periods.
+
+\subheading{Forecast Accuracy Metrics}
+Forecast accuracy is evaluated by comparing predicted values $\hat{y}_t$ with observed values $y_t$ on the test set. This project uses three standard metrics: MAE, RMSE, and MAPE. Mean Absolute Error is defined as
+\[
+\mathrm{MAE}=\frac{1}{n}\sum_{t=1}^{n}|y_t-\hat{y}_t|.
+\]
+MAE is easy to interpret because it is measured in the same unit as PM2.5, namely $\mu$g/m$^3$.
+
+Root Mean Squared Error is defined as
+\[
+\mathrm{RMSE}=\sqrt{\frac{1}{n}\sum_{t=1}^{n}(y_t-\hat{y}_t)^2}.
+\]
+RMSE penalizes large errors more heavily than MAE, so it is useful when large forecast mistakes are especially undesirable.
+
+Mean Absolute Percentage Error is defined as
+\[
+\mathrm{MAPE}=\frac{1}{n}\sum_{t=1}^{n}\left|\frac{y_t-\hat{y}_t}{y_t}\right|.
+\]
+MAPE expresses error relative to the observed value, making it useful for comparing accuracy across different scales. However, it can be unstable when observed values are very close to zero. Since PM2.5 values in the Delhi test set are positive, MAPE remains interpretable for this application.
+
+\subheading{Residual Diagnostics}
+After fitting a model, residual diagnostics are used to assess whether the model has captured the main structure of the time series. The residual is
+\[
+e_t = y_t - \hat{y}_t.
+\]
+A good forecasting model should have residuals that are centered near zero, approximately stable in variance, and free from autocorrelation. If residuals remain autocorrelated, then the model has failed to capture some predictable temporal pattern.
+
+The Ljung-Box test is used to test whether residual autocorrelations are jointly different from zero. Its statistic is
+\[
+Q = n(n+2)\sum_{k=1}^{h}\frac{\hat{\rho}_k^2}{n-k},
+\]
+where $\hat{\rho}_k$ is the residual autocorrelation at lag $k$, $h$ is the maximum lag, and $n$ is the sample size. The null hypothesis is that the residuals are independently distributed up to lag $h$. A large $p$-value indicates that there is no strong evidence of remaining autocorrelation.
+
+Additional diagnostics include checking whether residuals have mean close to zero, whether outliers are present, whether variance is stable over time, and whether the residual distribution is approximately normal. These diagnostics do not prove that a model is correct, but they help determine whether the model is adequate for short-term forecasting.
+
+\chapternumber[Three]{Expected Results and Discussion}
+The expected result is that the SARIMA model will perform better than a naive forecast when pollution levels are persistent and seasonality is stable.  Forecast accuracy can be evaluated using mean absolute error, root mean squared error, and visual comparison between observed and predicted PM2.5 values.
+
+However, SARIMA may perform poorly during sudden pollution shocks, such as festival-related emissions, dust storms, crop-burning episodes, or abrupt weather changes.  These limitations suggest that SARIMA is useful as a baseline, while richer models may need meteorological and policy variables.
+
+\chapternumber[Four]{Conclusion}
+This draft proposes a short empirical paper on forecasting PM2.5 concentration in Delhi using a SARIMA model.  The format emphasizes a clear research question, a concise description of the data, transparent model notation, and a focused discussion of expected findings.
+
+The next step is to replace the illustrative paragraphs with actual data summaries, estimated SARIMA parameters, forecast plots, and a formal accuracy table.  Once results are available, the conclusion should state whether SARIMA is accurate enough for short-term air-quality planning.
+
+
+
+\section*{References}
+\addcontentsline{toc}{section}{References}
+
+Rao, Rohan. 2020. ``Air Quality Data in India.'' Kaggle Dataset. \url{https://www.kaggle.com/datasets/rohanrao/air-quality-data-in-india}.
+
+Chumnaul, Jularat and Kasikrit Damkliang. 2025. ``Integrating Quantile Regression with ARIMA and ANN for Interpretable and Accurate PM2.5 Forecasting in Hat Yai, Thailand.'' \textit{Scientific Reports} 15: 43352. \url{https://doi.org/10.1038/s41598-025-27294-1}.
+
+Khan, Darakhshan Rizwan, Archana B. Patankar, and Aayisha Khan. 2024. ``An Experimental Comparison of Classic Statistical Techniques on Univariate Time Series Forecasting.'' \textit{Procedia Computer Science} 235: 2730--2740. \url{https://doi.org/10.1016/j.procs.2024.04.257}.
+
+Necula, Sabina-Cristiana, Ileana Hauer, Doina Fotache, and Luminița Hurbean. 2025. ``Advanced Hybrid Models for Air Pollution Forecasting: Combining SARIMA and BiLSTM Architectures.'' \textit{Electronics} 14 (3): 549. \url{https://doi.org/10.3390/electronics14030549}.
+
+Bahadure, Nilesh Bhaskarrao, Sudhanshu Gonge, Deepak Parashar, Bhoomi Shah, Prasenjeet Damodar Patil, M. Renugadevi, and Nagrajan Raju. 2025. ``SVR Machine Learning and SARIMA-Based Air Quality Index Classification and Forecasting System.'' \textit{Discover Applied Sciences} 7: 994. \url{https://doi.org/10.1007/s42452-025-07327-0}.
+
+Souza, Amaury de, José Roberto Zenteno Jimenez, José Francisco de Oliveira-Júnior, and Kelvy Rosalvo Alencar Cardoso. 2025. ``Statistical Modeling of PM2.5 Concentrations: Prediction of Extreme Events and Evaluation of Advanced Methods for Air Quality Management.'' \textit{Journal of Atmospheric Science Research} 8 (3): 67--92. \url{https://doi.org/10.30564/jasr.v8i3.10878}.
+
+Wang, Meng, Qiaofeng Zhang, Caiwang Tai, Jiazhen Li, Zongwei Yang, Kejun Shen, and Chengbin Guo. 2022. ``Design of PM2.5 Monitoring and Forecasting System for Opencast Coal Mine Road Based on Internet of Things and ARIMA Mode.'' \textit{PLOS ONE} 17 (5): e0267440. \url{https://doi.org/10.1371/journal.pone.0267440}.
+
+\end{document}
