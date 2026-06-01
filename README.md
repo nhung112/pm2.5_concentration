@@ -13,7 +13,7 @@
 ## Repository Structure
 
 ```
-time-series/
+pm2.5_concentration/
 ├─ data/
 │  └─ delhi_aqi.csv        # primary dataset (PM2.5 measurements)
 ├─ Notebooks/
@@ -21,9 +21,7 @@ time-series/
 │  └─ model_sarima.ipynb    # model development and forecasting
 ├─ images/                  # plots and visual assets
 ├─ reports/                 # exported reports and tables
-├─ main.tex                 # LaTeX source for the formal report
 ├─ requirements.txt         # Python dependencies
-├─ .venv/                   # optional virtual environment (not tracked)
 ├─ README.md
 └─ .gitignore
 ```
@@ -33,7 +31,6 @@ Links:
 - data: [data/delhi_aqi.csv](data/delhi_aqi.csv)
 - notebooks: [Notebooks/EDA _preprocessing.ipynb](Notebooks/EDA%20_preprocessing.ipynb), [Notebooks/model_sarima.ipynb](Notebooks/model_sarima.ipynb)
 
-If you'd like, I can convert this ASCII tree into a Markdown table or add file sizes/last-modified notes.
 
 ## Requirements
 
